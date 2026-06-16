@@ -271,6 +271,19 @@ async def test_dash_gaussian_mesh_registers_obj_result(client, db_session, tmp_p
     categories = {item["filename"]: item["category"] for item in data["result_files"]}
     assert categories["dash_gaussian_mesh.obj"] == FileCategory.MESH_MODEL.value
     assert categories["dash_gaussian_mesh.mtl"] == FileCategory.OTHER.value
+    detail = await client.get(f"/api/v1/reconstruction/tasks/{task_id}", headers=headers)
+    assert detail.status_code == 200
+    results_by_filename = {item["filename"]: item for item in detail.json()["results"]}
+    assert results_by_filename["dash_gaussian_mesh.obj"] == {
+        "file_id": data["result_id"],
+        "filename": "dash_gaussian_mesh.obj",
+        "file_type": "model",
+        "category": "mesh_model",
+        "mime_type": "model/obj",
+        "size_bytes": len("obj-result".encode("utf-8")),
+    }
+    assert results_by_filename["dash_gaussian_mesh.mtl"]["category"] == "mesh_model"
+    assert results_by_filename["dash_gaussian_mesh.mtl"]["size_bytes"] == len("newmtl material".encode("utf-8"))
 
 
 @pytest.mark.asyncio

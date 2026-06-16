@@ -497,6 +497,13 @@ def _original_input_kind(task: TaskRecord) -> str:
     return ""
 
 
+def _result_category_for_client(file: FileRecord) -> str:
+    generated_by = (file.metainfo or {}).get("generated_by")
+    if file.category in {FileCategory.MESH_MODEL, FileCategory.GLB_MODEL} or generated_by in MESH_ALGORITHMS:
+        return "mesh_model"
+    return "render_model"
+
+
 def _task_response(task: TaskRecord, *, include_private: bool = False) -> ReconstructionStatusResponse:
     result_ids = _role_file_ids(task, TaskFileRole.RESULT)
     preview_ids = _role_file_ids(task, TaskFileRole.PREVIEW)
@@ -566,6 +573,17 @@ def _task_response(task: TaskRecord, *, include_private: bool = False) -> Recons
         result_file_id=result_id,
         result_storage_key=result_id,
         ply_id=ply_id,
+        results=[
+            {
+                "file_id": file.public_id,
+                "filename": file.filename,
+                "file_type": file.file_type,
+                "category": _result_category_for_client(file),
+                "mime_type": file.mime_type,
+                "size_bytes": int(file.file_size or 0),
+            }
+            for file in result_files
+        ],
         result_files=[
             {
                 "file_id": file.public_id,

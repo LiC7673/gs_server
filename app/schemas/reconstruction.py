@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -92,6 +92,15 @@ class ReconstructionResultFileResponse(BaseModel):
     filename: str
 
 
+class ReconstructionTaskResultResponse(BaseModel):
+    file_id: str
+    filename: str
+    file_type: FileType
+    category: Literal["render_model", "mesh_model"]
+    mime_type: str
+    size_bytes: int
+
+
 class ReconstructionStatusResponse(BaseModel):
     task_id: str
     user_id: int
@@ -114,6 +123,7 @@ class ReconstructionStatusResponse(BaseModel):
     result_file_id: Optional[str] = None
     result_storage_key: Optional[str] = None
     ply_id: Optional[str] = None
+    results: List[ReconstructionTaskResultResponse] = Field(default_factory=list)
     result_files: List[ReconstructionResultFileResponse] = Field(default_factory=list)
     preview_ids: List[str] = Field(default_factory=list)
     error_code: Optional[str] = None

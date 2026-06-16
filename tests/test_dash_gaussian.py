@@ -302,6 +302,19 @@ async def test_dash_gaussian_registers_precise_iteration_result(client, db_sessi
     by_filename = {item["filename"]: item for item in data["result_files"]}
     assert by_filename["point_cloud.ply"]["category"] == FileCategory.PLY_MODEL.value
     assert by_filename["cfg_args"]["category"] == FileCategory.OTHER.value
+    detail = await client.get(f"/api/v1/reconstruction/tasks/{created.json()['task_id']}", headers=headers)
+    assert detail.status_code == 200
+    results_by_filename = {item["filename"]: item for item in detail.json()["results"]}
+    assert results_by_filename["point_cloud.ply"] == {
+        "file_id": by_filename["point_cloud.ply"]["file_id"],
+        "filename": "point_cloud.ply",
+        "file_type": "model",
+        "category": "render_model",
+        "mime_type": "model/ply",
+        "size_bytes": len(b"ply-result"),
+    }
+    assert results_by_filename["cfg_args"]["category"] == "render_model"
+    assert results_by_filename["cfg_args"]["size_bytes"] > 0
     records = list((await db_session.execute(
         select(FileRecord).where(FileRecord.public_id.in_(
             [item["file_id"] for item in data["result_files"]]

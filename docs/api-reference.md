@@ -311,7 +311,8 @@ GET /api/v1/files
 | `result_file_id` | string \| null | 兼容字段，当前等于 `result_id` |
 | `result_storage_key` | string \| null | 兼容字段，当前等于 `result_id` |
 | `ply_id` | string \| null | PLY 结果兼容字段 |
-| `result_files` | array | 所有结果文件；DashGaussian 包括主 PLY 和模型支持文件，Mesh 算法包括 OBJ/GLB 及其附属输出 |
+| `results` | array | 新结果文件数组；每项包含 `file_id`、`filename`、`file_type`、`category`、`mime_type`、`size_bytes`。`category` 只返回 `render_model` 或 `mesh_model`；3DGS PLY 是 `render_model`，基于 PLY 的 Mesh/重建结果是 `mesh_model` |
+| `result_files` | array | 旧兼容结果文件数组；保留数据库原始分类，例如 `ply_model`、`mesh_model`、`glb_model` |
 | `preview_ids` | array[string] | 预览文件 ID |
 | `error_code` | string \| null | 错误码；仅所有者和管理员可见 |
 | `error_status_code` | integer \| null | 错误状态码；仅所有者和管理员可见 |
@@ -348,27 +349,30 @@ Hunyuan3D 完成示例：
   "result_file_id": "file_glb",
   "result_storage_key": "file_glb",
   "ply_id": "file_ply",
-  "result_files": [
+  "results": [
     {
       "file_id": "file_glb",
-      "category": "glb_model",
+      "filename": "hunyuan3d_result.glb",
       "file_type": "model",
+      "category": "mesh_model",
       "mime_type": "model/gltf-binary",
-      "filename": "hunyuan3d_result.glb"
+      "size_bytes": 123456
     },
     {
       "file_id": "file_ply",
-      "category": "ply_model",
+      "filename": "point_cloud.ply",
       "file_type": "model",
+      "category": "render_model",
       "mime_type": "model/ply",
-      "filename": "point_cloud.ply"
+      "size_bytes": 234567
     },
     {
       "file_id": "file_obj",
-      "category": "mesh_model",
+      "filename": "mesh.obj",
       "file_type": "model",
+      "category": "mesh_model",
       "mime_type": "model/obj",
-      "filename": "mesh.obj"
+      "size_bytes": 345678
     }
   ],
   "preview_ids": [],
@@ -1687,8 +1691,9 @@ manual_review
 ```
 
 高斯完成的正常状态是 `completed/gaussian_completed`。前端主动执行 Mesh 后，成功状态是
-`completed/mesh_completed`；失败状态是 `partial_completed/mesh_failed`。`result_files`
+`completed/mesh_completed`；失败状态是 `partial_completed/mesh_failed`。`results`
 保留当前可用的 PLY，以及各 Mesh 算法最近一次成功的结果，前端按类别选择并使用统一下载接口。
+旧兼容字段 `result_files` 仍会同步返回。
 
 > **重复功能标记：** 当前响应与 `GET /api/v1/reconstruction/tasks/{task_id}` 相同。保留该接口是为了明确表达“轮询状态”用途。
 
@@ -1824,7 +1829,7 @@ POST /api/v1/reconstruction/tasks
 → Body 可以为 {}
 → GET /api/v1/reconstruction/status/{task_id}
 → 轮询原 task_id，直到 current_stage=gaussian_completed
-→ 从 result_files 读取 ply_model
+→ 从 results 读取 render_model PLY
 → 使用 /api/v1/files/{file_id}/download/* 下载
 ```
 
@@ -1874,9 +1879,9 @@ gaussian_completed
 → POST /api/v1/reconstruction/mesh/start/{task_id}
 → Body: {"algorithm":"hunyuan3d","input_file_ids":["原始输入 file_id"],"params":{}}
 → GET /api/v1/reconstruction/status/{task_id}
-→ 读取 result_files
+→ 读取 results
 → result_id 是 GLB 主结果
-→ result_files 中还有 OBJ、MTL、纹理和其他输出文件各自的 file_id
+→ results 中还有 OBJ、MTL、纹理和其他输出文件各自的 file_id
 → 两个文件都使用 /api/v1/files/{file_id}/download/* 下载
 ```
 
@@ -1939,7 +1944,7 @@ Authorization: Bearer {{token}}
 
 4. 可选 Params 不使用时取消勾选，避免发送空字符串。
 5. 上传和下载分片接口使用二进制 Body，不使用 `multipart/form-data`。
-6. Hunyuan3D 结果读取 `result_files`；旧前端只读取 `result_id` 时仍可下载 GLB 主模型。
+6. Hunyuan3D 结果读取 `results`；旧前端只读取 `result_id` 时仍可下载 GLB 主模型。
 
 ## 12. 当前 reconstruction 任务模型
 
@@ -1970,26 +1975,28 @@ Authorization: Bearer {{token}}
 上传完成后调用 `POST /api/v1/reconstruction/start/{task_id}` 启动高斯，Body 可使用 `{}`。
 高斯完成后按需调用 `POST /api/v1/reconstruction/mesh/start/{task_id}`，提交 Mesh `algorithm` 和 `input_file_ids`
 和可选 Mesh `params`。
-查询 `GET /api/v1/reconstruction/status/{task_id}` 或 `GET /api/v1/reconstruction/tasks/{task_id}` 时，前端应读取 `result_files`：
+查询 `GET /api/v1/reconstruction/status/{task_id}` 或 `GET /api/v1/reconstruction/tasks/{task_id}` 时，前端应读取 `results`：
 
 ```json
 [
   {
     "file_id": "file_ply",
-    "category": "ply_model",
+    "category": "render_model",
     "file_type": "model",
     "mime_type": "model/ply",
-    "filename": "point_cloud.ply"
+    "filename": "point_cloud.ply",
+    "size_bytes": 123456
   },
   {
     "file_id": "file_mesh",
     "category": "mesh_model",
     "file_type": "model",
     "mime_type": "model/obj",
-    "filename": "dash_gaussian_mesh.obj"
+    "filename": "dash_gaussian_mesh.obj",
+    "size_bytes": 654321
   }
 ]
 ```
 
-`dash_gaussian_mesh` 阶段会根据请求里的 PLY `file_id` 读取其 `metainfo.generation_id`，只恢复同一轮 DashGaussian 输出中的 `cfg_args` 和模型支持文件，自动把 `--output` 补成 `dash_gaussian_mesh.obj` 文件路径，并把 Mesh 输出目录中的 OBJ、MTL、贴图、JSON 等有效文件登记到 `result_files`。失败时任务状态为 `partial_completed`，已有 PLY 等结果仍保留。下载仍统一使用 `/api/v1/files/{file_id}/download/*`。
+`dash_gaussian_mesh` 阶段会根据请求里的 PLY `file_id` 读取其 `metainfo.generation_id`，只恢复同一轮 DashGaussian 输出中的 `cfg_args` 和模型支持文件，自动把 `--output` 补成 `dash_gaussian_mesh.obj` 文件路径，并把 Mesh 输出目录中的 OBJ、MTL、贴图、JSON 等有效文件登记到 `results`。失败时任务状态为 `partial_completed`，已有 PLY 等结果仍保留。下载仍统一使用 `/api/v1/files/{file_id}/download/*`。
 
