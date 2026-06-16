@@ -1,0 +1,392 @@
+{
+  "base_url": "http://127.0.0.1:8888/api/v1",
+  "image_dir": "/data1/lzh/dhh/test_data_obj",
+  "gaussian": {
+    "anysplat": {
+      "task_id": "recon_445449f5c8a64a69a4d69665c2a58bac",
+      "status": "completed",
+      "current_stage": "gaussian_completed",
+      "progress": 100.0,
+      "queue_reason": null,
+      "error_code": null,
+      "error_status_code": null,
+      "error": null,
+      "ply_id": "file_36534bf60a354be1a688183c065b9e13",
+      "result_id": "file_36534bf60a354be1a688183c065b9e13",
+      "result_files": [
+        {
+          "file_id": "file_36534bf60a354be1a688183c065b9e13",
+          "category": "ply_model",
+          "file_type": "model",
+          "mime_type": "model/ply",
+          "filename": "result.ply"
+        }
+      ],
+      "gpu_seconds_cost": 49,
+      "gpu_quota_exceeded": false
+    },
+    "dash_gaussian": {
+      "task_id": "recon_b8a28388b5e04154afad0582050a274a",
+      "status": "completed",
+      "current_stage": "gaussian_completed",
+      "progress": 100.0,
+      "queue_reason": null,
+      "error_code": null,
+      "error_status_code": null,
+      "error": null,
+      "ply_id": "file_dc399258e0f2470f96c54a2d0944f14a",
+      "result_id": "file_dc399258e0f2470f96c54a2d0944f14a",
+      "result_files": [
+        {
+          "file_id": "file_1ca3c2e51654487a8480d846fc639077",
+          "category": "other",
+          "file_type": "other",
+          "mime_type": "application/octet-stream",
+          "filename": "TRAIN_INFO"
+        },
+        {
+          "file_id": "file_c2fdccf4724e4cb4a480bced8a9e5559",
+          "category": "other",
+          "file_type": "other",
+          "mime_type": "application/json",
+          "filename": "cameras.json"
+        },
+        {
+          "file_id": "file_137cbdf1f564458c9bf5f578c28d85c0",
+          "category": "other",
+          "file_type": "other",
+          "mime_type": "text/plain",
+          "filename": "cfg_args"
+        },
+        {
+          "file_id": "file_9b6cbc1ae7db42989995d98100d329df",
+          "category": "other",
+          "file_type": "other",
+          "mime_type": "application/json",
+          "filename": "exposure.json"
+        },
+        {
+          "file_id": "file_594fd1e035cd4f00bea4a58d65f61a84",
+          "category": "other",
+          "file_type": "model",
+          "mime_type": "model/ply",
+          "filename": "input.ply"
+        },
+        {
+          "file_id": "file_dc399258e0f2470f96c54a2d0944f14a",
+          "category": "ply_model",
+          "file_type": "model",
+          "mime_type": "model/ply",
+          "filename": "point_cloud.ply"
+        },
+        {
+          "file_id": "file_ba970926a71248acbcc20d082270529b",
+          "category": "other",
+          "file_type": "other",
+          "mime_type": "application/octet-stream",
+          "filename": "database.db"
+        },
+        {
+          "file_id": "file_49eaa45ce1c2437c94a3f68820807721",
+          "category": "other",
+          "file_type": "other",
+          "mime_type": "application/octet-stream",
+          "filename": "cameras.bin"
+        },
+        {
+          "file_id": "file_4a86c203d0164bdf9775bdfab4337c26",
+          "category": "other",
+          "file_type": "other",
+          "mime_type": "application/octet-stream",
+          "filename": "frames.bin"
+        },
+        {
+          "file_id": "file_bb0976e5ac3f44f083d104859e6a5628",
+          "category": "other",
+          "file_type": "other",
+          "mime_type": "application/octet-stream",
+          "filename": "images.bin"
+        },
+        {
+          "file_id": "file_d8c69afb24014306b43a803772777e5a",
+          "category": "other",
+          "file_type": "other",
+          "mime_type": "application/octet-stream",
+          "filename": "points3D.bin"
+        },
+        {
+          "file_id": "file_7ffcf69d0d2347279bac43d900128640",
+          "category": "other",
+          "file_type": "other",
+          "mime_type": "application/octet-stream",
+          "filename": "project.ini"
+        },
+        {
+          "file_id": "file_579085b438fe4d9bbcfe088fb25e0be2",
+          "category": "other",
+          "file_type": "other",
+          "mime_type": "application/octet-stream",
+          "filename": "rigs.bin"
+        },
+        {
+          "file_id": "file_ccd3af5e5c6340e6a34b0852fe2bb207",
+          "category": "other",
+          "file_type": "image",
+          "mime_type": "image/jpeg",
+          "filename": "image_000004.jpg"
+        },
+        {
+          "file_id": "file_2ced6ce3ff1e443094ad483df7ffae80",
+          "category": "other",
+          "file_type": "image",
+          "mime_type": "image/jpeg",
+          "filename": "image_000005.jpg"
+        },
+        {
+          "file_id": "file_48c98c26fb354d58b14e0a26c9a69a51",
+          "category": "other",
+          "file_type": "image",
+          "mime_type": "image/jpeg",
+          "filename": "image_000006.jpg"
+        },
+        {
+          "file_id": "file_e49eee1ede914cfe956e8ea827eff576",
+          "category": "other",
+          "file_type": "image",
+          "mime_type": "image/jpeg",
+          "filename": "image_000008.jpg"
+        },
+        {
+          "file_id": "file_973a98bfe61d456bb1f59bc050e7343a",
+          "category": "other",
+          "file_type": "image",
+          "mime_type": "image/jpeg",
+          "filename": "image_000000.jpg"
+        },
+        {
+          "file_id": "file_95b18629dc7c440e9dc5271daab7b821",
+          "category": "other",
+          "file_type": "image",
+          "mime_type": "image/jpeg",
+          "filename": "image_000001.jpg"
+        },
+        {
+          "file_id": "file_3ec7f157a32b45a782ba3e2430215073",
+          "category": "other",
+          "file_type": "image",
+          "mime_type": "image/jpeg",
+          "filename": "image_000002.jpg"
+        },
+        {
+          "file_id": "file_f5efc4e6686b49bab327f2dc0aece200",
+          "category": "other",
+          "file_type": "image",
+          "mime_type": "image/jpeg",
+          "filename": "image_000003.jpg"
+        },
+        {
+          "file_id": "file_4194706d1c3e4225b19322e9bc53d1c7",
+          "category": "other",
+          "file_type": "image",
+          "mime_type": "image/jpeg",
+          "filename": "image_000004.jpg"
+        },
+        {
+          "file_id": "file_166aeb9a92be4a149cfda1ab8e0cd861",
+          "category": "other",
+          "file_type": "image",
+          "mime_type": "image/jpeg",
+          "filename": "image_000005.jpg"
+        },
+        {
+          "file_id": "file_0bfcf70619324f1495a723ec31aaa798",
+          "category": "other",
+          "file_type": "image",
+          "mime_type": "image/jpeg",
+          "filename": "image_000006.jpg"
+        },
+        {
+          "file_id": "file_8c8668f8130d412ebabe34f1bf0fa60b",
+          "category": "other",
+          "file_type": "image",
+          "mime_type": "image/jpeg",
+          "filename": "image_000007.jpg"
+        },
+        {
+          "file_id": "file_c68243714b594951980c59db910ac688",
+          "category": "other",
+          "file_type": "image",
+          "mime_type": "image/jpeg",
+          "filename": "image_000008.jpg"
+        },
+        {
+          "file_id": "file_cb5984bf00aa4eedb6200490e2f1f932",
+          "category": "other",
+          "file_type": "other",
+          "mime_type": "text/x-sh",
+          "filename": "run-colmap-geometric.sh"
+        },
+        {
+          "file_id": "file_aadfc99234ba469db4f3e6f23e7b53d8",
+          "category": "other",
+          "file_type": "other",
+          "mime_type": "text/x-sh",
+          "filename": "run-colmap-photometric.sh"
+        },
+        {
+          "file_id": "file_89207f652f684b4fbce33dc2b57d2b5f",
+          "category": "other",
+          "file_type": "other",
+          "mime_type": "application/octet-stream",
+          "filename": "cameras.bin"
+        },
+        {
+          "file_id": "file_8fb95ddb42cd4c2e92278722eabec378",
+          "category": "other",
+          "file_type": "other",
+          "mime_type": "application/octet-stream",
+          "filename": "frames.bin"
+        },
+        {
+          "file_id": "file_b6d3960a09ab431f99b544a7ba1cf412",
+          "category": "other",
+          "file_type": "other",
+          "mime_type": "application/octet-stream",
+          "filename": "images.bin"
+        },
+        {
+          "file_id": "file_25dcc540868445ed8066c7b678c2f8f7",
+          "category": "other",
+          "file_type": "other",
+          "mime_type": "application/octet-stream",
+          "filename": "points3D.bin"
+        },
+        {
+          "file_id": "file_b4b560c163344ed0840a743e38e85989",
+          "category": "other",
+          "file_type": "model",
+          "mime_type": "model/ply",
+          "filename": "points3D.ply"
+        },
+        {
+          "file_id": "file_4f7b9a852d95457ba6394f4912ef2d83",
+          "category": "other",
+          "file_type": "other",
+          "mime_type": "application/octet-stream",
+          "filename": "rigs.bin"
+        },
+        {
+          "file_id": "file_fabc4234dc614ff1853117243309ffdd",
+          "category": "other",
+          "file_type": "other",
+          "mime_type": "application/octet-stream",
+          "filename": "fusion.cfg"
+        },
+        {
+          "file_id": "file_b42e290158bc4f7f9d48cbeccb324436",
+          "category": "other",
+          "file_type": "other",
+          "mime_type": "application/octet-stream",
+          "filename": "patch-match.cfg"
+        }
+      ],
+      "gpu_seconds_cost": 201,
+      "gpu_quota_exceeded": false
+    },
+    "vggt_omega": {
+      "task_id": "recon_7e6cdb6555f54dc3b56dcffd7b3532e6",
+      "status": "failed",
+      "current_stage": "gaussian_failed",
+      "progress": 100.0,
+      "queue_reason": null,
+      "error_code": "ALGORITHM_EXIT_NONZERO",
+      "error_status_code": 500,
+      "error": "Traceback (most recent call last):\n  File \"/algorithms/vggt-omega/example.py\", line 138, in segment_foreground_with_sam\n    from segment_anything import (\nModuleNotFoundError: No module named 'segment_anything'\n\nThe above exception was the direct cause of the following exception:\n\nTraceback (most recent call last):\n  File \"/algorithms/vggt-omega/example.py\", line 439, in <module>\n    main()\n  File \"/algorithms/vggt-omega/example.py\", line 404, in main\n    foreground_masks = segment_foreground_with_sam(\n  File \"/algorithms/vggt-omega/example.py\", line 144, in segment_foreground_with_sam\n    raise RuntimeError(\nRuntimeError: Could not import segment_anything. Check --sam_package_path.\n\nERROR conda.cli.main_run:execute(127): `conda run python example.py --input /scratch/reconstruction/recon_7e6cdb6555f54dc3b56dcffd7b3532e6_b53bed3001ce4b218e4f1b1726199f9b/images --output_dir /scratch/reconstruction/recon_7e6cdb6555f54dc3b56dcffd7b3532e6_b53bed3001ce4b218e4f1b1726199f9b/output` failed. (Se",
+      "ply_id": null,
+      "result_id": null,
+      "result_files": [],
+      "gpu_seconds_cost": 10,
+      "gpu_quota_exceeded": false
+    }
+  },
+  "mesh": {
+    "dash_gaussian_mesh": {
+      "status": "exception",
+      "error": "POST http://127.0.0.1:8888/api/v1/reconstruction/mesh/start/recon_445449f5c8a64a69a4d69665c2a58bac failed: HTTP 400\n{\"detail\":\"Selected PLY was not generated by DashGaussian; rerun the Gaussian stage before Mesh\"}"
+    },
+    "hunyuan3d": {
+      "task_id": "recon_445449f5c8a64a69a4d69665c2a58bac",
+      "status": "completed",
+      "current_stage": "mesh_completed",
+      "progress": 100.0,
+      "queue_reason": null,
+      "error_code": null,
+      "error_status_code": null,
+      "error": null,
+      "ply_id": "file_36534bf60a354be1a688183c065b9e13",
+      "result_id": "file_09456d6a8e4e43f189667a52e81bdbff",
+      "result_files": [
+        {
+          "file_id": "file_09456d6a8e4e43f189667a52e81bdbff",
+          "category": "glb_model",
+          "file_type": "model",
+          "mime_type": "model/gltf-binary",
+          "filename": "hunyuan3d_result.glb"
+        },
+        {
+          "file_id": "file_36534bf60a354be1a688183c065b9e13",
+          "category": "ply_model",
+          "file_type": "model",
+          "mime_type": "model/ply",
+          "filename": "result.ply"
+        },
+        {
+          "file_id": "file_ea7bac1387fe494daea040f09ad58c18",
+          "category": "other",
+          "file_type": "image",
+          "mime_type": "image/jpeg",
+          "filename": "hunyuan3d_result.jpg"
+        },
+        {
+          "file_id": "file_077f3e48e30e4b6582997094b6921b29",
+          "category": "other",
+          "file_type": "model",
+          "mime_type": "model/mtl",
+          "filename": "hunyuan3d_result.mtl"
+        },
+        {
+          "file_id": "file_d41ff00655524a42a0792b2fe0bd1503",
+          "category": "mesh_model",
+          "file_type": "model",
+          "mime_type": "model/obj",
+          "filename": "hunyuan3d_result.obj"
+        },
+        {
+          "file_id": "file_c4e354ba10ba40e99386672ac2afaf01",
+          "category": "other",
+          "file_type": "image",
+          "mime_type": "image/jpeg",
+          "filename": "hunyuan3d_result_metallic.jpg"
+        },
+        {
+          "file_id": "file_2bc7d250b31543f4b25958a072ef8e41",
+          "category": "other",
+          "file_type": "image",
+          "mime_type": "image/png",
+          "filename": "hunyuan3d_result_nobg.png"
+        },
+        {
+          "file_id": "file_94a16575abf7497d8a2bd0ed2de63eb8",
+          "category": "other",
+          "file_type": "image",
+          "mime_type": "image/jpeg",
+          "filename": "hunyuan3d_result_roughness.jpg"
+        }
+      ],
+      "gpu_seconds_cost": 345,
+      "gpu_quota_exceeded": false
+    }
+  },
+  "selected_mesh_base_task_id": "recon_445449f5c8a64a69a4d69665c2a58bac",
+  "selected_ply_id": "file_36534bf60a354be1a688183c065b9e13"
+}

@@ -1,0 +1,152 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: 3dgs-gpu-worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: 3dgs-gpu-worker
+  template:
+    metadata:
+      labels:
+        app: 3dgs-gpu-worker
+    spec:
+      containers:
+        - name: worker
+          image: your-registry/3dgs-worker:latest
+          command:
+            - celery
+            - -A
+            - app.worker.worker:celery_app
+            - worker
+            - -Q
+            - reconstruction
+            - --loglevel=info
+            - --concurrency=1
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: 3dgs-backend
+                  key: database-url
+            - name: DATABASE_URL_SYNC
+              valueFrom:
+                secretKeyRef:
+                  name: 3dgs-backend
+                  key: database-url-sync
+            - name: CELERY_BROKER_URL
+              valueFrom:
+                secretKeyRef:
+                  name: 3dgs-backend
+                  key: celery-broker-url
+            - name: CELERY_RESULT_BACKEND
+              valueFrom:
+                secretKeyRef:
+                  name: 3dgs-backend
+                  key: celery-result-backend
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: 3dgs-backend
+                  key: redis-url
+            - name: S3_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: 3dgs-backend
+                  key: s3-endpoint
+            - name: S3_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: 3dgs-backend
+                  key: s3-access-key
+            - name: S3_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: 3dgs-backend
+                  key: s3-secret-key
+            - name: S3_BUCKET
+              value: 3dgs-files
+            - name: STORAGE_BACKEND
+              value: s3
+            - name: GPU_SCHEDULER_MODE
+              value: k8s
+            - name: GPU_DEVICE_IDS
+              value: "0"
+            - name: WORKER_NODE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: WORKER_EXECUTOR_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.uid
+            - name: RECONSTRUCTION_WORKER_CONCURRENCY
+              value: "1"
+            - name: RECONSTRUCTION_SCRATCH_PATH
+              value: /scratch/reconstruction
+            - name: ANYSPLAT_PYTHON_PATH
+              value: /data1/lzh/anaconda3/envs/anysplat/bin/python
+            - name: ANYSPLAT_PATH
+              value: /data1/lzh/lzy/AnySplat
+            - name: ANYSPLAT_ENTRYPOINT
+              value: /data1/lzh/lzy/AnySplat/export_scene_gaussians.py
+            - name: ANYSPLAT_ARGS_TEMPLATE
+              value: "{input_path} --frame_nums {frame_nums} --output_folder {output_folder} --crop_quantile {crop_quantile}"
+            - name: HUNYUAN3D_CONDA_PATH
+              value: /data1/lzh/anaconda3/bin/conda
+            - name: HUNYUAN3D_PATH
+              value: /data1/lzh/lzy/hunyuan3d-2.1
+            - name: HUNYUAN3D_ENTRYPOINT
+              value: example.py
+            - name: HUNYUAN3D_ARGS_TEMPLATE
+              value: "{input_path} -o {output_folder}"
+            - name: HUNYUAN3D_COMMAND_TEMPLATE
+              value: "{python_path} run -n hunyuan3d python {entrypoint} {args}"
+            - name: HUNYUAN3D_TIMEOUT_SECONDS
+              value: "1800"
+          resources:
+            limits:
+              nvidia.com/gpu: "1"
+          volumeMounts:
+            - name: scratch
+              mountPath: /scratch/reconstruction
+            - name: anysplat
+              mountPath: /algorithms/AnySplat
+              readOnly: true
+            - name: anysplat
+              mountPath: /data1/lzh/lzy/AnySplat
+              readOnly: true
+            - name: segment-then-splat
+              mountPath: /algorithms/segment_then_splat
+              readOnly: true
+            - name: vggt-omega
+              mountPath: /algorithms/vggt-omega
+              readOnly: true
+            - name: hunyuan3d
+              mountPath: /data1/lzh/lzy/hunyuan3d-2.1
+              readOnly: true
+            - name: conda
+              mountPath: /opt/conda
+              readOnly: true
+            - name: conda
+              mountPath: /data1/lzh/anaconda3
+              readOnly: true
+      volumes:
+        - name: scratch
+          emptyDir: {}
+        - name: anysplat
+          hostPath:
+            path: /data1/lzh/lzy/AnySplat
+        - name: segment-then-splat
+          hostPath:
+            path: /data1/lzh/lzy/segment_then_splat
+        - name: vggt-omega
+          hostPath:
+            path: /data1/lzh/lzy/vggt-omega
+        - name: hunyuan3d
+          hostPath:
+            path: /data1/lzh/lzy/hunyuan3d-2.1
+        - name: conda
+          hostPath:
+            path: /data1/lzh/anaconda3

@@ -1,0 +1,232 @@
+version: "3.9"
+
+x-common-env: &common-env
+  DATABASE_URL: "postgresql+asyncpg://user:password@postgres:5432/3dgs"
+  DATABASE_URL_SYNC: "postgresql://user:password@postgres:5432/3dgs"
+  CELERY_BROKER_URL: "redis://redis:6379/0"
+  CELERY_RESULT_BACKEND: "redis://redis:6379/1"
+  REDIS_URL: "redis://redis:6379/2"
+  STORAGE_BACKEND: "s3"
+  S3_ENDPOINT: "http://minio:9000"
+  S3_ACCESS_KEY: "minioadmin"
+  S3_SECRET_KEY: "minioadmin123"
+  S3_BUCKET: "3dgs-files"
+  API_SCRATCH_PATH: "/tmp/3dgs-api"
+  RECONSTRUCTION_SCRATCH_PATH: "/scratch/reconstruction"
+  RECONSTRUCTION_QUEUE_NAME: "reconstruction"
+  RECONSTRUCTION_WORKER_CONCURRENCY: "8"
+  RECONSTRUCTION_STALE_PROCESSING_SECONDS: "300"
+  DEFAULT_MESH_ALGORITHM: "dash_gaussian_mesh"
+  DEFAULT_USER_ACTIVE_TASK_QUOTA: "10"
+  DEFAULT_USER_GPU_CONCURRENCY_QUOTA: "1"
+  DEFAULT_USER_GPU_DAILY_QUOTA_SECONDS: "3600"
+  GPU_QUOTA_TIMEZONE: "Asia/Shanghai"
+  MEDIA_QUEUE_NAME: "media"
+  MEDIA_WORKER_CONCURRENCY: "2"
+  MEDIA_SCRATCH_PATH: "/scratch/media"
+  MEDIA_MAX_IMAGE_PIXELS: "100000000"
+  MEDIA_THUMBNAIL_MAX_EDGE: "512"
+  MEDIA_THUMBNAIL_JPEG_QUALITY: "80"
+  MEDIA_TASK_MAX_RETRIES: "3"
+  MEDIA_RETRY_COUNTDOWN_SECONDS: "30"
+  MEDIA_STALE_PROCESSING_SECONDS: "300"
+  WORKER_NODE_ID: "${WORKER_NODE_ID:-gpu-node-01}"
+  GPU_SCHEDULER_MODE: "${GPU_SCHEDULER_MODE:-local}"
+  GPU_DEVICE_IDS: "${GPU_DEVICE_IDS:-0,1,2,3,4,5,6,7}"
+  GPU_LEASE_TTL_SECONDS: "60"
+  GPU_RETRY_COUNTDOWN_SECONDS: "10"
+  GPU_MEMORY_BUSY_THRESHOLD_MB: "512"
+  GPU_REQUIRE_NVIDIA_SMI: "true"
+  SECRET_KEY: "change-me-in-production"
+  ANYSPLAT_PYTHON_PATH: "/data1/lzh/anaconda3/envs/anysplat/bin/python"
+  ANYSPLAT_PATH: "/data1/lzh/lzy/AnySplat"
+  ANYSPLAT_ENTRYPOINT: "/data1/lzh/lzy/AnySplat/export_scene_gaussians.py"
+  ANYSPLAT_ARGS_TEMPLATE: "{input_path} --frame_nums {frame_nums} --output_folder {output_folder} --crop_quantile {crop_quantile}"
+  DASH_GAUSSIAN_CONDA_PATH: "/data1/lzh/anaconda3/bin/conda"
+  DASH_GAUSSIAN_PATH: "/data1/lzh/lzy/DashGaussian"
+  DASH_GAUSSIAN_ENTRYPOINT: "train_dash.py"
+  DASH_GAUSSIAN_ARGS_TEMPLATE: "--input_path {input_path} -m {output_folder} --iterations {iterations} --disable_viewer"
+  DASH_GAUSSIAN_COMMAND_TEMPLATE: "{python_path} run -n DashGaussian python {entrypoint} {args}"
+  DASH_GAUSSIAN_TIMEOUT_SECONDS: "7200"
+  VGGT_OMEGA_PYTHON_PATH: "/opt/conda/bin/conda"
+  VGGT_OMEGA_PATH: "/algorithms/vggt-omega"
+  HUNYUAN3D_CONDA_PATH: "/data1/lzh/anaconda3/bin/conda"
+  HUNYUAN3D_PATH: "/data1/lzh/lzy/hunyuan3d-2.1"
+  HUNYUAN3D_ENTRYPOINT: "example.py"
+  HUNYUAN3D_ARGS_TEMPLATE: "{input_path} -o {output_glb}"
+  HUNYUAN3D_COMMAND_TEMPLATE: "{python_path} run -n hunyuan3d python {entrypoint} {args}"
+  HUNYUAN3D_TIMEOUT_SECONDS: "1800"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: 3dgs
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d 3dgs"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    volumes:
+      - miniodata:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 minioadmin minioadmin123;
+      mc mb --ignore-existing local/3dgs-files;
+      "
+
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment: *common-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: alembic upgrade head
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment: *common-env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    volumes:
+      - api-scratch:/tmp/3dgs-api
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    environment:
+      <<: *common-env
+      U2NET_HOME: "/data1/lzh/.u2net"
+    gpus: all
+    volumes:
+      - worker-scratch:/scratch/reconstruction
+      - ${ANYSPLAT_HOST_PATH:-/data1/lzh/lzy/AnySplat}:/algorithms/AnySplat:ro
+      - ${ANYSPLAT_HOST_PATH:-/data1/lzh/lzy/AnySplat}:/data1/lzh/lzy/AnySplat:ro
+      - ${HF_CACHE_HOST_PATH:-/data1/lzh/.cache/huggingface}:/data1/lzh/.cache/huggingface:ro
+      - ${U2NET_HOST_PATH:-/data1/lzh/.u2net}:/data1/lzh/.u2net:ro
+      - ${DASH_GAUSSIAN_HOST_PATH:-/data1/lzh/lzy/DashGaussian}:/data1/lzh/lzy/DashGaussian:ro
+      - ${VGGT_OMEGA_HOST_PATH:-/data1/lzh/lzy/vggt-omega}:/algorithms/vggt-omega:ro
+      - ${ANACONDA_HOST_PATH:-/data1/lzh/anaconda3}:/opt/conda:ro
+      - ${HUNYUAN3D_HOST_PATH:-/data1/lzh/lzy/hunyuan3d-2.1}:/data1/lzh/lzy/hunyuan3d-2.1:ro
+      - ${ANACONDA_HOST_PATH:-/data1/lzh/anaconda3}:/data1/lzh/anaconda3:ro
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    command: celery -A app.worker.worker:celery_app worker -Q reconstruction --loglevel=info --concurrency=8
+
+  maintenance-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment: *common-env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    command: celery -A app.worker.worker:celery_app worker -Q maintenance --loglevel=info --concurrency=1
+
+  media-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.media
+    environment: *common-env
+    volumes:
+      - media-scratch:/scratch/media
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    command: celery -A app.worker.worker:celery_app worker -Q media --loglevel=info --concurrency=2
+
+  beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment: *common-env
+    depends_on:
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    command: celery -A app.worker.worker:celery_app beat --loglevel=info
+
+  flower:
+    image: mher/flower:2.0
+    ports:
+      - "5555:5555"
+    environment:
+      CELERY_BROKER_URL: "redis://redis:6379/0"
+      CELERY_RESULT_BACKEND: "redis://redis:6379/1"
+    depends_on:
+      redis:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  redisdata:
+  miniodata:
+  api-scratch:
+  worker-scratch:
+  media-scratch:

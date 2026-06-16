@@ -1,0 +1,1 @@
+{"services":{"migrate":{"build":{"network":"host"}},"api":{"build":{"network":"host"}},"worker":{"build":{"network":"host"}},"maintenance-worker":{"build":{"network":"host"}},"media-worker":{"build":{"network":"host"}},"beat":{"build":{"network":"host"}}}}

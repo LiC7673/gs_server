@@ -1,0 +1,9 @@
+.env
+.git
+.idea
+__pycache__
+*.py[cod]
+.pytest_cache
+.ruff_cache
+storage
+gs_photo_android_flutter

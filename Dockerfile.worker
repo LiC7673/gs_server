@@ -1,0 +1,21 @@
+FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    ffmpeg \
+    libgl1 \
+    libsm6 \
+    libxext6 \
+    libxrender1 \
+    python3 \
+    python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip3 install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+CMD ["celery", "-A", "app.worker.worker:celery_app", "worker", "-Q", "reconstruction", "--loglevel=info"]
