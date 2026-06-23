@@ -1194,15 +1194,18 @@ Body：无。
 
 ## 8. 重建任务
 
-### 8.1 获取算法列表
+### 8.1 获取渲染/高斯算法列表
 
 ```http
-GET /api/v1/reconstruction/algorithms
+GET /api/v1/reconstruction/render/algorithm
 Authorization: Bearer <token>
+X-App-Locale: zh-CN
 ```
 
 - Path 参数：无
 - Query 参数：无
+- Header：
+  - `X-App-Locale`：可选，`zh-CN` 或 `en-US`，用于切换参数显示名和说明文案；默认 `zh-CN`
 - Body：无
 
 响应：
@@ -1213,17 +1216,40 @@ Authorization: Bearer <token>
     {
       "name": "anysplat",
       "display_name": "AnySplat",
-      "available": true
+      "available": true,
+      "params": [
+        {
+          "param_name": "frame_nums",
+          "description": "从视频中取多少帧参与重建；更多帧通常细节更好，但速度更慢、显存和内存占用更高。",
+          "display_name": "抽帧数量",
+          "default_value": 4
+        },
+        {
+          "param_name": "crop_quantile",
+          "description": "控制输入画面的保留范围；数值更大保留更多背景，可能提升完整度，但会增加计算量并可能带入噪声。",
+          "display_name": "裁剪范围",
+          "default_value": 0.8
+        }
+      ]
     },
     {
       "name": "dash_gaussian",
       "display_name": "DashGaussian",
-      "available": true
+      "available": true,
+      "params": [
+        {
+          "param_name": "iterations",
+          "description": "高斯模型训练次数；更多轮数通常质量更稳定，但耗时更长、GPU 占用更久。",
+          "display_name": "训练轮数",
+          "default_value": 30000
+        }
+      ]
     },
     {
       "name": "vggt_omega",
       "display_name": "VGGT Omega",
-      "available": true
+      "available": true,
+      "params": []
     }
   ],
   "default_algorithm": "anysplat"
@@ -1232,23 +1258,66 @@ Authorization: Bearer <token>
 
 `available` 只表示后端已配置必要路径字符串。真正执行环境仍可通过管理员诊断接口检查。
 该接口只返回可创建任务的高斯算法。`dash_gaussian_mesh` 和 `hunyuan3d` 不在此列表中。
+旧路径 `GET /api/v1/reconstruction/algorithms` 暂时保留为兼容别名，新客户端应使用
+`GET /api/v1/reconstruction/render/algorithm`。
 
 Mesh 算法使用独立列表：
 
 ```http
 GET /api/v1/reconstruction/mesh/algorithms
 Authorization: Bearer <token>
+X-App-Locale: en-US
 ```
 
 ```json
 {
   "algorithms": [
-    {"name": "dash_gaussian_mesh", "display_name": "DashGaussian PLY to Mesh", "available": true},
-    {"name": "hunyuan3d", "display_name": "Hunyuan3D 2.1", "available": true}
+    {
+      "name": "dash_gaussian_mesh",
+      "display_name": "DashGaussian PLY to Mesh",
+      "available": true,
+      "dependencies": {
+        "required_stage": "gaussian_completed",
+        "required_gaussian_algorithms": ["dash_gaussian"],
+        "required_input_type": "ply_model",
+        "description": "Requires a completed dash_gaussian render stage and one PLY result from the same task."
+      },
+      "params": [
+        {
+          "param_name": "radius",
+          "description": "Filters Gaussian points far from the subject; smaller values are cleaner and faster but may remove edge detail, while larger values keep more detail with more noise and memory use.",
+          "display_name": "Radius filter",
+          "default_value": 4
+        },
+        {
+          "param_name": "voxel_size",
+          "description": "Controls mesh resolution; smaller values keep more detail but are slower and use more GPU and system memory, while larger values are faster but coarser.",
+          "display_name": "Mesh voxel size",
+          "default_value": 0.02
+        }
+      ]
+    },
+    {
+      "name": "hunyuan3d",
+      "display_name": "Hunyuan3D 2.1",
+      "available": true,
+      "dependencies": {
+        "required_stage": "gaussian_completed",
+        "required_gaussian_algorithms": [],
+        "required_input_type": "original_media",
+        "description": "Requires an existing Gaussian result; input must be original image(s) or one video from the same task."
+      },
+      "params": []
+    }
   ],
   "default_algorithm": "dash_gaussian_mesh"
 }
 ```
+
+上方 Mesh 示例为节选；`dash_gaussian_mesh.params` 实际会返回 `radius`、`cluster_voxel_size`、
+`keep_largest`、`iteration`、`views`、`voxel_size`、`sdf_trunc`、`alpha_threshold`、
+`max_depth`、`depth_quantile`、`mask_erode` 的完整列表。
+`dependencies.required_gaussian_algorithms` 为空数组表示不限定具体高斯算法；非空时必须匹配同一任务的高斯阶段算法。
 
 ### 8.2 创建任务
 

@@ -1,0 +1,5 @@
+conda activate DashGaussian
+cd /data1/lzh/lzy/DashGaussian
+
+python train_dash.py   --input_path 视频路径或图片文件夹路径  -m 输出文件夹   --iterations 30000   --disable_viewer
+高斯点云保存到：输出文件夹/point_cloud/iteration_30000/point_cloud.ply

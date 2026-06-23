@@ -61,17 +61,36 @@ async def create_task(client, headers, params=None):
 @pytest.mark.asyncio
 async def test_dash_gaussian_replaces_segment_then_splat_in_algorithm_list(client):
     headers = await register(client, "dashalgorithms")
-    response = await client.get("/api/v1/reconstruction/algorithms", headers=headers)
+    response = await client.get(
+        "/api/v1/reconstruction/render/algorithm",
+        headers={**headers, "X-App-Locale": "en-US"},
+    )
     assert response.status_code == 200
     names = {item["name"] for item in response.json()["algorithms"]}
     assert "dash_gaussian" in names
     assert "segment_then_splat" not in names
     dash = next(item for item in response.json()["algorithms"] if item["name"] == "dash_gaussian")
-    assert dash == {
-        "name": "dash_gaussian",
-        "display_name": "DashGaussian",
-        "available": True,
-    }
+    assert dash["name"] == "dash_gaussian"
+    assert dash["display_name"] == "DashGaussian"
+    assert dash["available"] is True
+    assert dash["params"] == [
+        {
+            "param_name": "iterations",
+            "description": (
+                "Number of Gaussian training iterations; more iterations usually improve "
+                "stability and quality but take longer and occupy the GPU for more time."
+            ),
+            "display_name": "Training iterations",
+            "default_value": 30000,
+        }
+    ]
+
+    zh_response = await client.get(
+        "/api/v1/reconstruction/render/algorithm",
+        headers={**headers, "X-App-Locale": "zh-CN"},
+    )
+    zh_dash = next(item for item in zh_response.json()["algorithms"] if item["name"] == "dash_gaussian")
+    assert zh_dash["params"][0]["display_name"] == "训练轮数"
 
 
 @pytest.mark.asyncio

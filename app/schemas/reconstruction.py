@@ -20,10 +20,28 @@ def _normalize_input_type(value: Optional[str], allowed: set[str]) -> Optional[s
     return normalized
 
 
+class ReconstructionAlgorithmParamResponse(BaseModel):
+    param_name: str
+    description: str
+    display_name: str
+    default_value: Any
+
+
+class ReconstructionAlgorithmDependencyResponse(BaseModel):
+    required_stage: Optional[str] = None
+    required_gaussian_algorithms: List[str] = Field(default_factory=list)
+    required_input_type: Optional[str] = None
+    description: str = ""
+
+
 class ReconstructionAlgorithmResponse(BaseModel):
     name: str
     display_name: str
     available: bool
+    params: List[ReconstructionAlgorithmParamResponse] = Field(default_factory=list)
+    dependencies: ReconstructionAlgorithmDependencyResponse = Field(
+        default_factory=ReconstructionAlgorithmDependencyResponse
+    )
 
 
 class ReconstructionAlgorithmsResponse(BaseModel):

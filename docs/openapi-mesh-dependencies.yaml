@@ -1,0 +1,338 @@
+openapi: 3.1.0
+info:
+  title: 3DGS Reconstruction Mesh Dependency API
+  version: 1.0.0
+  description: >
+    OpenAPI export for frontend integration of Mesh algorithm dependencies.
+    The full backend OpenAPI is still available from /openapi.json when the
+    service runs with the project dependencies installed.
+servers:
+  - url: http://127.0.0.1:8000
+    description: Local development server
+security:
+  - bearerAuth: []
+tags:
+  - name: reconstruction
+paths:
+  /api/v1/reconstruction/mesh/algorithms:
+    get:
+      tags:
+        - reconstruction
+      summary: List Mesh algorithms and dependencies
+      description: >
+        Returns Mesh-stage methods with parameter metadata and dependency
+        constraints. dash_gaussian_mesh can only run after a completed
+        dash_gaussian Gaussian/render stage in the same reconstruction task.
+      operationId: listMeshAlgorithms
+      parameters:
+        - name: X-App-Locale
+          in: header
+          required: false
+          description: Locale for parameter and dependency descriptions.
+          schema:
+            type: string
+            enum:
+              - zh-CN
+              - en-US
+            default: zh-CN
+      responses:
+        "200":
+          description: Mesh algorithm list.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReconstructionAlgorithmsResponse"
+              examples:
+                zhCN:
+                  summary: Chinese dependency metadata
+                  value:
+                    algorithms:
+                      - name: dash_gaussian_mesh
+                        display_name: DashGaussian PLY to Mesh
+                        available: true
+                        params:
+                          - param_name: radius
+                            description: 过滤离主体较远的高斯点；值越小越干净、速度更快，但可能删掉边缘细节；值越大保留更多细节但噪声和内存占用更高。
+                            display_name: 半径过滤
+                            default_value: 4
+                          - param_name: voxel_size
+                            description: 控制 Mesh 网格精细度；值越小细节越多，但速度更慢、显存和内存占用更高；值越大更快但更粗糙。
+                            display_name: Mesh 体素大小
+                            default_value: 0.02
+                        dependencies:
+                          required_stage: gaussian_completed
+                          required_gaussian_algorithms:
+                            - dash_gaussian
+                          required_input_type: ply_model
+                          description: 只能在 dash_gaussian 高斯阶段成功后运行，输入必须是该任务的 PLY 结果。
+                      - name: hunyuan3d
+                        display_name: Hunyuan3D 2.1
+                        available: true
+                        params: []
+                        dependencies:
+                          required_stage: gaussian_completed
+                          required_gaussian_algorithms: []
+                          required_input_type: original_media
+                          description: 需要任务已有高斯结果，输入使用该任务的原始图片、图片组或单视频。
+                    default_algorithm: dash_gaussian_mesh
+                enUS:
+                  summary: English dependency metadata
+                  value:
+                    algorithms:
+                      - name: dash_gaussian_mesh
+                        display_name: DashGaussian PLY to Mesh
+                        available: true
+                        params:
+                          - param_name: radius
+                            description: Filters Gaussian points far from the subject; smaller values are cleaner and faster but may remove edge detail, while larger values keep more detail with more noise and memory use.
+                            display_name: Radius filter
+                            default_value: 4
+                          - param_name: voxel_size
+                            description: Controls mesh resolution; smaller values keep more detail but are slower and use more GPU and system memory, while larger values are faster but coarser.
+                            display_name: Mesh voxel size
+                            default_value: 0.02
+                        dependencies:
+                          required_stage: gaussian_completed
+                          required_gaussian_algorithms:
+                            - dash_gaussian
+                          required_input_type: ply_model
+                          description: Requires a completed dash_gaussian render stage and one PLY result from the same task.
+                      - name: hunyuan3d
+                        display_name: Hunyuan3D 2.1
+                        available: true
+                        params: []
+                        dependencies:
+                          required_stage: gaussian_completed
+                          required_gaussian_algorithms: []
+                          required_input_type: original_media
+                          description: Requires an existing Gaussian result; input must be original image(s) or one video from the same task.
+                    default_algorithm: dash_gaussian_mesh
+        "401":
+          description: Missing or invalid Bearer token.
+  /api/v1/reconstruction/mesh/start/{task_id}:
+    post:
+      tags:
+        - reconstruction
+      summary: Start Mesh reconstruction for a task
+      description: >
+        Starts a Mesh-stage algorithm on an existing reconstruction task.
+        dash_gaussian_mesh requires the same task to have completed the
+        dash_gaussian Gaussian/render stage and requires one linked PLY result.
+      operationId: startMeshReconstruction
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: recon_8f42abc
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReconstructionMeshStartRequest"
+            examples:
+              dashGaussianMesh:
+                summary: Start dash_gaussian_mesh from a dash_gaussian PLY
+                value:
+                  algorithm: dash_gaussian_mesh
+                  input_file_ids:
+                    - file_ply
+                  params:
+                    radius: 10
+                    voxel_size: 0.02
+              hunyuan3d:
+                summary: Start Hunyuan3D from original media
+                value:
+                  algorithm: hunyuan3d
+                  input_file_ids:
+                    - file_original_image
+                  params: {}
+      responses:
+        "200":
+          description: Mesh task queued.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReconstructionStartResponse"
+        "400":
+          description: Dependency or input validation failed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                dashGaussianRequired:
+                  summary: dash_gaussian_mesh dependency mismatch
+                  value:
+                    detail: dash_gaussian_mesh requires a completed dash_gaussian Gaussian result
+                taskPlyRequired:
+                  summary: PLY is not linked to this task
+                  value:
+                    detail: input_file_ids must contain a PLY result linked to this task
+        "401":
+          description: Missing or invalid Bearer token.
+        "422":
+          description: Request body validation failed or unsupported Mesh algorithm.
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    ReconstructionAlgorithmsResponse:
+      type: object
+      required:
+        - algorithms
+        - default_algorithm
+      properties:
+        algorithms:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReconstructionAlgorithmResponse"
+        default_algorithm:
+          type: string
+          example: dash_gaussian_mesh
+    ReconstructionAlgorithmResponse:
+      type: object
+      required:
+        - name
+        - display_name
+        - available
+      properties:
+        name:
+          type: string
+          enum:
+            - dash_gaussian_mesh
+            - hunyuan3d
+        display_name:
+          type: string
+        available:
+          type: boolean
+        params:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReconstructionAlgorithmParamResponse"
+          default: []
+        dependencies:
+          $ref: "#/components/schemas/ReconstructionAlgorithmDependencyResponse"
+    ReconstructionAlgorithmParamResponse:
+      type: object
+      required:
+        - param_name
+        - description
+        - display_name
+        - default_value
+      properties:
+        param_name:
+          type: string
+          example: radius
+        description:
+          type: string
+        display_name:
+          type: string
+        default_value:
+          description: Default parameter value. Type depends on parameter.
+    ReconstructionAlgorithmDependencyResponse:
+      type: object
+      description: >
+        Dependency metadata for a Mesh method. Empty required_gaussian_algorithms
+        means the Mesh method does not restrict the Gaussian algorithm.
+      properties:
+        required_stage:
+          type:
+            - string
+            - "null"
+          enum:
+            - gaussian_completed
+            - null
+          example: gaussian_completed
+        required_gaussian_algorithms:
+          type: array
+          items:
+            type: string
+            enum:
+              - anysplat
+              - dash_gaussian
+              - vggt_omega
+          example:
+            - dash_gaussian
+        required_input_type:
+          type:
+            - string
+            - "null"
+          enum:
+            - ply_model
+            - original_media
+            - null
+          example: ply_model
+        description:
+          type: string
+    ReconstructionMeshStartRequest:
+      type: object
+      required:
+        - algorithm
+        - input_file_ids
+      additionalProperties: false
+      properties:
+        algorithm:
+          type: string
+          enum:
+            - dash_gaussian_mesh
+            - hunyuan3d
+        input_file_ids:
+          type: array
+          minItems: 1
+          items:
+            type: string
+          example:
+            - file_ply
+        params:
+          type: object
+          additionalProperties: true
+          default: {}
+    ReconstructionStartResponse:
+      type: object
+      required:
+        - task_id
+        - status
+        - status_code
+        - algorithm
+        - current_stage
+        - input_type
+        - input_file_count
+      properties:
+        task_id:
+          type: string
+          example: recon_8f42abc
+        status:
+          type: string
+          example: queued
+        status_code:
+          type: integer
+          example: 202
+        algorithm:
+          type: string
+          example: dash_gaussian_mesh
+        current_stage:
+          type: string
+          example: mesh_queued
+        input_type:
+          type: string
+          example: ply_model
+        input_file_count:
+          type: integer
+          example: 1
+        queue_reason:
+          type:
+            - string
+            - "null"
+    ErrorResponse:
+      type: object
+      required:
+        - detail
+      properties:
+        detail:
+          type: string

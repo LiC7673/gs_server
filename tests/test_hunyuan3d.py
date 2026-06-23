@@ -84,6 +84,13 @@ async def test_hunyuan3d_is_only_listed_as_mesh_and_cannot_create_task(client):
     mesh_algorithms = await client.get("/api/v1/reconstruction/mesh/algorithms", headers=headers)
     hunyuan = next(item for item in mesh_algorithms.json()["algorithms"] if item["name"] == "hunyuan3d")
     assert hunyuan["available"] is True
+    assert hunyuan["params"] == []
+    assert hunyuan["dependencies"] == {
+        "required_stage": "gaussian_completed",
+        "required_gaussian_algorithms": [],
+        "required_input_type": "original_media",
+        "description": "需要任务已有高斯结果，输入使用该任务的原始图片、图片组或单视频。",
+    }
     rejected = await client.post("/api/v1/reconstruction/tasks", headers=headers, json={
         "title": "invalid standalone Hunyuan",
         "algorithm": "hunyuan3d",

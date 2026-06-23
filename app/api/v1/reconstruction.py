@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi import APIRouter, Depends, Header, Query, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -80,6 +80,157 @@ DASH_GAUSSIAN_MESH_DEFAULT_PARAMS = {
     "mask_erode": 2,
 }
 DASH_GAUSSIAN_MESH_ALLOWED_PARAMS = {"radius", *DASH_GAUSSIAN_MESH_DEFAULT_PARAMS}
+
+SUPPORTED_LOCALES = {"zh-CN", "en-US"}
+DEFAULT_LOCALE = "zh-CN"
+ALGORITHM_PARAM_TEXT = {
+    "anysplat": {
+        "frame_nums": {
+            "display_name": {
+                "zh-CN": "抽帧数量",
+                "en-US": "Frame count",
+            },
+            "description": {
+                "zh-CN": "从视频中取多少帧参与重建；更多帧通常细节更好，但速度更慢、显存和内存占用更高。",
+                "en-US": "How many frames to use from a video; more frames usually improve detail but run slower and use more GPU and system memory.",
+            },
+        },
+        "crop_quantile": {
+            "display_name": {
+                "zh-CN": "裁剪范围",
+                "en-US": "Crop range",
+            },
+            "description": {
+                "zh-CN": "控制输入画面的保留范围；数值更大保留更多背景，可能提升完整度，但会增加计算量并可能带入噪声。",
+                "en-US": "Controls how much of the input view is kept; higher values preserve more background, which can improve completeness but cost more compute and may add noise.",
+            },
+        },
+    },
+    "dash_gaussian": {
+        "iterations": {
+            "display_name": {
+                "zh-CN": "训练轮数",
+                "en-US": "Training iterations",
+            },
+            "description": {
+                "zh-CN": "高斯模型训练次数；更多轮数通常质量更稳定，但耗时更长、GPU 占用更久。",
+                "en-US": "Number of Gaussian training iterations; more iterations usually improve stability and quality but take longer and occupy the GPU for more time.",
+            },
+        },
+    },
+    "dash_gaussian_mesh": {
+        "radius": {
+            "display_name": {
+                "zh-CN": "半径过滤",
+                "en-US": "Radius filter",
+            },
+            "description": {
+                "zh-CN": "过滤离主体较远的高斯点；值越小越干净、速度更快，但可能删掉边缘细节；值越大保留更多细节但噪声和内存占用更高。",
+                "en-US": "Filters Gaussian points far from the subject; smaller values are cleaner and faster but may remove edge detail, while larger values keep more detail with more noise and memory use.",
+            },
+        },
+        "cluster_voxel_size": {
+            "display_name": {
+                "zh-CN": "聚类体素大小",
+                "en-US": "Cluster voxel size",
+            },
+            "description": {
+                "zh-CN": "控制点云聚类过滤的粗细；较大值过滤更强、速度更快，但可能损失小结构；较小值保留细节但更慢。",
+                "en-US": "Controls how coarse cluster filtering is; larger values filter more aggressively and run faster but may lose small structures, while smaller values preserve detail but are slower.",
+            },
+        },
+        "keep_largest": {
+            "display_name": {
+                "zh-CN": "只保留最大主体",
+                "en-US": "Keep largest component",
+            },
+            "description": {
+                "zh-CN": "开启后只保留最大的连通主体，能减少漂浮噪点；如果场景有多个独立物体，可能会删掉较小物体。",
+                "en-US": "Keeps only the largest connected component to reduce floating noise; if the scene has multiple separate objects, smaller objects may be removed.",
+            },
+        },
+        "iteration": {
+            "display_name": {
+                "zh-CN": "读取轮数",
+                "en-US": "Source iteration",
+            },
+            "description": {
+                "zh-CN": "选择用于导出 Mesh 的高斯训练轮数；通常保持默认值，与高斯训练结果一致即可。",
+                "en-US": "Selects which Gaussian training iteration to convert to mesh; usually keep the default so it matches the Gaussian result.",
+            },
+        },
+        "views": {
+            "display_name": {
+                "zh-CN": "渲染视角集合",
+                "en-US": "Render views",
+            },
+            "description": {
+                "zh-CN": "用于深度融合的视角集合；默认使用训练视角，质量稳定且速度可控。",
+                "en-US": "View set used for depth fusion; the default training views give stable quality with predictable runtime.",
+            },
+        },
+        "voxel_size": {
+            "display_name": {
+                "zh-CN": "Mesh 体素大小",
+                "en-US": "Mesh voxel size",
+            },
+            "description": {
+                "zh-CN": "控制 Mesh 网格精细度；值越小细节越多，但速度更慢、显存和内存占用更高；值越大更快但更粗糙。",
+                "en-US": "Controls mesh resolution; smaller values keep more detail but are slower and use more GPU and system memory, while larger values are faster but coarser.",
+            },
+        },
+        "sdf_trunc": {
+            "display_name": {
+                "zh-CN": "SDF 截断距离",
+                "en-US": "SDF truncation",
+            },
+            "description": {
+                "zh-CN": "控制深度融合时表面附近的融合范围；较大值更平滑但可能糊掉细节，较小值更锐利但更容易破碎。",
+                "en-US": "Controls the fusion band around surfaces; larger values are smoother but can blur detail, while smaller values are sharper but may fragment.",
+            },
+        },
+        "alpha_threshold": {
+            "display_name": {
+                "zh-CN": "透明度阈值",
+                "en-US": "Alpha threshold",
+            },
+            "description": {
+                "zh-CN": "过滤透明或低置信度区域；阈值更高网格更干净但可能缺面，阈值更低保留更多但噪声更多。",
+                "en-US": "Filters transparent or low-confidence areas; higher values make cleaner meshes but may create holes, while lower values keep more surfaces with more noise.",
+            },
+        },
+        "max_depth": {
+            "display_name": {
+                "zh-CN": "最大深度",
+                "en-US": "Max depth",
+            },
+            "description": {
+                "zh-CN": "限制参与融合的最远深度；较小值减少远处噪声并更快，较大值能覆盖更大场景但更耗资源。",
+                "en-US": "Limits the farthest depth used for fusion; smaller values reduce distant noise and run faster, while larger values cover bigger scenes with more resource use.",
+            },
+        },
+        "depth_quantile": {
+            "display_name": {
+                "zh-CN": "深度分位裁剪",
+                "en-US": "Depth quantile",
+            },
+            "description": {
+                "zh-CN": "裁掉极端深度值来减少异常面；值越低过滤越强但可能损失完整度，值越高保留更多但更容易有噪声。",
+                "en-US": "Clips extreme depth values to reduce outlier surfaces; lower values filter more aggressively but may lose completeness, while higher values keep more with more noise.",
+            },
+        },
+        "mask_erode": {
+            "display_name": {
+                "zh-CN": "掩码收缩",
+                "en-US": "Mask erosion",
+            },
+            "description": {
+                "zh-CN": "收缩前景掩码边缘；数值更大边缘更干净但可能变瘦或缺细节，数值更小保留更多边缘但噪声更高。",
+                "en-US": "Shrinks mask edges; larger values make edges cleaner but may thin the object or remove detail, while smaller values keep more edges with more noise.",
+            },
+        },
+    },
+}
 @dataclass(frozen=True)
 class AlgorithmSpec:
     name: str
@@ -192,6 +343,78 @@ def _get_algorithm_spec(name: str) -> AlgorithmSpec:
     if not spec.available:
         raise AppException(f"Algorithm is not configured: {name}", status.HTTP_503_SERVICE_UNAVAILABLE)
     return spec
+
+
+def _locale(value: Optional[str]) -> str:
+    if not value:
+        return DEFAULT_LOCALE
+    normalized = value.strip()
+    return normalized if normalized in SUPPORTED_LOCALES else DEFAULT_LOCALE
+
+
+def _localized_text(values: Dict[str, str], locale: str) -> str:
+    return values.get(locale) or values.get(DEFAULT_LOCALE) or next(iter(values.values()), "")
+
+
+def _algorithm_default_params(name: str) -> Dict[str, Any]:
+    if name == "anysplat":
+        return dict(ANYSPLAT_DEFAULT_PARAMS)
+    if name == "dash_gaussian":
+        return dict(DASH_GAUSSIAN_DEFAULT_PARAMS)
+    if name == "dash_gaussian_mesh":
+        return dict(DASH_GAUSSIAN_MESH_DEFAULT_PARAMS)
+    return {}
+
+
+def _algorithm_params_response(name: str, locale: str) -> List[Dict[str, Any]]:
+    defaults = _algorithm_default_params(name)
+    texts = ALGORITHM_PARAM_TEXT.get(name, {})
+    return [
+        {
+            "param_name": param_name,
+            "description": _localized_text(texts[param_name]["description"], locale),
+            "display_name": _localized_text(texts[param_name]["display_name"], locale),
+            "default_value": default_value,
+        }
+        for param_name, default_value in defaults.items()
+        if param_name in texts
+    ]
+
+
+def _algorithm_dependencies_response(name: str, locale: str) -> Dict[str, Any]:
+    if name == "dash_gaussian_mesh":
+        descriptions = {
+            "zh-CN": "只能在 dash_gaussian 高斯阶段成功后运行，输入必须是该任务的 PLY 结果。",
+            "en-US": "Requires a completed dash_gaussian render stage and one PLY result from the same task.",
+        }
+        return {
+            "required_stage": "gaussian_completed",
+            "required_gaussian_algorithms": ["dash_gaussian"],
+            "required_input_type": "ply_model",
+            "description": _localized_text(descriptions, locale),
+        }
+    if name == "hunyuan3d":
+        descriptions = {
+            "zh-CN": "需要任务已有高斯结果，输入使用该任务的原始图片、图片组或单视频。",
+            "en-US": "Requires an existing Gaussian result; input must be original image(s) or one video from the same task.",
+        }
+        return {
+            "required_stage": "gaussian_completed",
+            "required_gaussian_algorithms": [],
+            "required_input_type": "original_media",
+            "description": _localized_text(descriptions, locale),
+        }
+    return {}
+
+
+def _algorithm_response(spec: AlgorithmSpec, locale: str) -> ReconstructionAlgorithmResponse:
+    return ReconstructionAlgorithmResponse(
+        name=spec.name,
+        display_name=spec.display_name,
+        available=spec.available,
+        params=_algorithm_params_response(spec.name, locale),
+        dependencies=_algorithm_dependencies_response(spec.name, locale),
+    )
 
 
 def _utc_now() -> datetime:
@@ -1556,27 +1779,50 @@ async def _enqueue(task: TaskRecord, db: AsyncSession) -> str:
     return queued.id
 
 
-@router.get("/algorithms", response_model=ReconstructionAlgorithmsResponse)
-async def list_algorithms(current_user: User = Depends(get_current_user)):
+def _list_stage_algorithms(stage: str, default_algorithm: str, locale: str) -> ReconstructionAlgorithmsResponse:
     return ReconstructionAlgorithmsResponse(
         algorithms=[
-            ReconstructionAlgorithmResponse(name=spec.name, display_name=spec.display_name, available=spec.available)
+            _algorithm_response(spec, locale)
             for spec in _algorithm_specs().values()
-            if spec.stage == GAUSSIAN_STAGE
+            if spec.stage == stage
         ],
-        default_algorithm=settings.default_reconstruction_algorithm,
+        default_algorithm=default_algorithm,
+    )
+
+
+@router.get("/render/algorithm", response_model=ReconstructionAlgorithmsResponse)
+async def list_render_algorithms(
+    x_app_locale: Optional[str] = Header(None, alias="X-App-Locale"),
+    current_user: User = Depends(get_current_user),
+):
+    return _list_stage_algorithms(
+        GAUSSIAN_STAGE,
+        settings.default_reconstruction_algorithm,
+        _locale(x_app_locale),
+    )
+
+
+@router.get("/algorithms", response_model=ReconstructionAlgorithmsResponse, deprecated=True)
+async def list_algorithms(
+    x_app_locale: Optional[str] = Header(None, alias="X-App-Locale"),
+    current_user: User = Depends(get_current_user),
+):
+    return _list_stage_algorithms(
+        GAUSSIAN_STAGE,
+        settings.default_reconstruction_algorithm,
+        _locale(x_app_locale),
     )
 
 
 @router.get("/mesh/algorithms", response_model=ReconstructionAlgorithmsResponse)
-async def list_mesh_algorithms(current_user: User = Depends(get_current_user)):
-    return ReconstructionAlgorithmsResponse(
-        algorithms=[
-            ReconstructionAlgorithmResponse(name=spec.name, display_name=spec.display_name, available=spec.available)
-            for spec in _algorithm_specs().values()
-            if spec.stage == MESH_STAGE
-        ],
-        default_algorithm=settings.default_mesh_algorithm,
+async def list_mesh_algorithms(
+    x_app_locale: Optional[str] = Header(None, alias="X-App-Locale"),
+    current_user: User = Depends(get_current_user),
+):
+    return _list_stage_algorithms(
+        MESH_STAGE,
+        settings.default_mesh_algorithm,
+        _locale(x_app_locale),
     )
 
 
@@ -1866,6 +2112,8 @@ async def start_mesh_reconstruction(
         raise AppException("Derived files such as thumbnails cannot be Mesh inputs")
 
     if algorithm == "dash_gaussian_mesh":
+        if (task.gaussian_algorithm or task.algorithm) != "dash_gaussian":
+            raise AppException("dash_gaussian_mesh requires a completed dash_gaussian Gaussian result")
         if len(records) != 1:
             raise AppException("dash_gaussian_mesh requires exactly one PLY result")
         record = records[0]

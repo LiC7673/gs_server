@@ -45,10 +45,10 @@ async def upload(client, headers, name, content, mime_type="model/ply"):
     return merged.json()["file_id"]
 
 
-async def create_task(client, headers):
+async def create_task(client, headers, algorithm="dash_gaussian"):
     return await client.post("/api/v1/reconstruction/tasks", headers=headers, json={
         "title": "dash gaussian mesh test",
-        "algorithm": "dash_gaussian",
+        "algorithm": algorithm,
         "params": {},
     })
 
@@ -64,6 +64,19 @@ async def test_dash_gaussian_mesh_algorithm_and_params(client):
     assert mesh_algorithms.status_code == 200
     mesh_names = {item["name"] for item in mesh_algorithms.json()["algorithms"]}
     assert mesh_names == {"dash_gaussian_mesh", "hunyuan3d"}
+    dash_mesh = next(
+        item for item in mesh_algorithms.json()["algorithms"] if item["name"] == "dash_gaussian_mesh"
+    )
+    assert dash_mesh["dependencies"] == {
+        "required_stage": "gaussian_completed",
+        "required_gaussian_algorithms": ["dash_gaussian"],
+        "required_input_type": "ply_model",
+        "description": "只能在 dash_gaussian 高斯阶段成功后运行，输入必须是该任务的 PLY 结果。",
+    }
+    mesh_params = {item["param_name"]: item for item in dash_mesh["params"]}
+    assert mesh_params["radius"]["display_name"] == "半径过滤"
+    assert mesh_params["radius"]["default_value"] == 4
+    assert mesh_params["voxel_size"]["default_value"] == 0.02
 
     created = await create_task(client, headers)
     assert created.status_code == 200
@@ -75,6 +88,46 @@ async def test_dash_gaussian_mesh_algorithm_and_params(client):
         "mesh_params": {"radius": 10},
     })
     assert rejected.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_dash_gaussian_mesh_requires_dash_gaussian_predecessor(client, db_session):
+    headers = await register(client, "dashmeshdependency")
+    created = await create_task(client, headers, algorithm="anysplat")
+    task_id = created.json()["task_id"]
+    ply_id = await upload(client, headers, "anysplat-result.ply", b"ply", "model/ply")
+    cfg_id = await upload(client, headers, "cfg_args", b"Namespace(model_path='/old')", "text/plain")
+    task = await TaskService.get_by_public_id(db_session, task_id)
+    ply = await FileService.get_by_identifier_for_user(db_session, ply_id, task.user_id)
+    cfg = await FileService.get_by_identifier_for_user(db_session, cfg_id, task.user_id)
+    ply.metainfo = {
+        **(ply.metainfo or {}),
+        "generated_by": "anysplat",
+        "generation_id": "anysplat_dependency",
+        "relative_path": "point_cloud/iteration_30000/point_cloud.ply",
+        "primary_result": True,
+    }
+    cfg.metainfo = {
+        **(cfg.metainfo or {}),
+        "generated_by": "anysplat",
+        "generation_id": "anysplat_dependency",
+        "relative_path": "cfg_args",
+        "primary_result": False,
+    }
+    await TaskService.add_file_link(db_session, task, ply, TaskFileRole.RESULT)
+    await TaskService.add_file_link(db_session, task, cfg, TaskFileRole.RESULT)
+    task.status = TaskStatus.COMPLETED
+    task.current_stage = "gaussian_completed"
+    await db_session.commit()
+
+    rejected = await client.post(
+        f"/api/v1/reconstruction/mesh/start/{task_id}",
+        headers=headers,
+        json={"algorithm": "dash_gaussian_mesh", "input_file_ids": [ply_id]},
+    )
+
+    assert rejected.status_code == 400
+    assert rejected.json()["detail"] == "dash_gaussian_mesh requires a completed dash_gaussian Gaussian result"
 
 
 @pytest.mark.asyncio

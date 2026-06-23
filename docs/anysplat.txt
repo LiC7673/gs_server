@@ -1,0 +1,1 @@
+/data1/lzh/anaconda3/envs/anysplat/bin/pythonexport_scene_gaussians.py30c457508780f6ddb0bcb0ae4d3323e3.mp4/图像文件夹 --frame_nums 4 --output_folder 输出文件夹 --crop_quantile 0.8
