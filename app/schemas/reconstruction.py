@@ -4,6 +4,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.models.file import FileCategory, FileType
 from app.models.task import TaskStatus, TaskVisibility
+from app.schemas.upload import HEX_64_RE, UploadMergePart
 
 
 def _normalize_input_type(value: Optional[str], allowed: set[str]) -> Optional[str]:
@@ -180,6 +181,56 @@ class ReconstructionTaskInputsResponse(BaseModel):
     input_kind: str
     input_file_ids: List[str] = Field(default_factory=list)
     input_file_count: int
+
+
+class ReconstructionResultReplaceInitRequest(BaseModel):
+    filename: str
+    file_size: int = Field(..., gt=0)
+    chunk_size: Optional[int] = Field(None, gt=0)
+    mime_type: str = "model/ply"
+    file_hash: str
+
+    @field_validator("mime_type")
+    @classmethod
+    def validate_mime_type(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if normalized != "model/ply":
+            raise ValueError("Only model/ply result replacement is supported")
+        return normalized
+
+    @field_validator("file_hash")
+    @classmethod
+    def validate_file_hash(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if not HEX_64_RE.fullmatch(normalized):
+            raise ValueError("file_hash must be a SHA-256 hex string")
+        return normalized
+
+
+class ReconstructionResultReplaceInitResponse(BaseModel):
+    task_id: str
+    file_id: str
+    upload_id: str
+    chunk_size: int
+    total_chunks: int
+    expires_at: Optional[str] = None
+
+
+class ReconstructionResultReplaceCompleteRequest(BaseModel):
+    expected_hash: str = ""
+    expected_size: int = Field(0, ge=0)
+    parts: List[UploadMergePart]
+
+
+class ReconstructionResultReplaceCompleteResponse(BaseModel):
+    task_id: str
+    file_id: str
+    filename: str
+    mime_type: str
+    file_size: int
+    file_hash: str
+    replaced: bool
+    verified: bool
 
 
 class ReconstructionVisibilityRequest(BaseModel):

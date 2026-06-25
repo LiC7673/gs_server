@@ -253,6 +253,49 @@ class FileService:
         )
 
     @staticmethod
+    async def replace_record_storage(
+        db: AsyncSession,
+        record: FileRecord,
+        storage_object: StorageObject,
+        *,
+        filename: Optional[str],
+        file_size: int,
+        mime_type: str,
+        file_hash: str,
+        metainfo: Optional[Dict[str, Any]] = None,
+    ) -> FileRecord:
+        old_storage_object_id = record.storage_object_id
+        record.storage_object = storage_object
+        record.storage_object_id = storage_object.id
+        if filename:
+            record.original_name = filename
+        record.file_size = file_size
+        record.file_hash = file_hash.lower()
+        record.mime_type = mime_type
+        record.file_type = FileService.file_type_for(record.category, mime_type)
+        record.metainfo = {
+            **(record.metainfo or {}),
+            "size_bytes": file_size,
+            **(metainfo or {}),
+        }
+        await db.flush()
+        if old_storage_object_id != storage_object.id:
+            old_object = await db.get(StorageObject, old_storage_object_id)
+            if old_object:
+                references = await db.scalar(
+                    select(func.count())
+                    .select_from(FileRecord)
+                    .where(
+                        FileRecord.storage_object_id == old_object.id,
+                        FileRecord.is_deleted.is_(False),
+                    )
+                )
+                if not references:
+                    old_object.pending_delete = True
+        await db.refresh(record)
+        return record
+
+    @staticmethod
     async def find_user_file_by_hash(
         db: AsyncSession, user_id: int, file_hash: str, file_size: int
     ) -> Optional[FileRecord]:

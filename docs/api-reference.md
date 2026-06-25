@@ -1535,6 +1535,99 @@ Body：无。
 }
 ```
 
+### 8.5.2 替换任务 PLY 结果文件
+
+任务重建完成后，用户可下载 PLY 到本地修改，再选择上传云端覆盖原结果。覆盖流程保持原
+`file_id` 不变：后端先接收临时分片并校验完整性，校验成功后再把原结果文件指向新的对象存储文件。
+
+#### 初始化替换上传
+
+```http
+POST /api/v1/reconstruction/tasks/{task_id}/results/{file_id}/replace/init
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+Path 参数：
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `task_id` | string | 是 | 重建任务 ID |
+| `file_id` | string | 是 | 该任务已关联的 PLY 结果文件 ID |
+
+Body：
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `filename` | string | 是 | 修改后的本地文件名 |
+| `file_size` | integer | 是 | 修改后文件大小 |
+| `chunk_size` | integer \| null | 否 | 分片大小；省略时使用服务端默认值 |
+| `mime_type` | string | 否 | 固定为 `model/ply` |
+| `file_hash` | string | 是 | 修改后完整文件的 SHA-256 |
+
+响应：
+
+```json
+{
+  "task_id": "recon_xxx",
+  "file_id": "file_ply",
+  "upload_id": "upload_xxx",
+  "chunk_size": 1048576,
+  "total_chunks": 3,
+  "expires_at": "2026-06-24T12:00:00Z"
+}
+```
+
+#### 上传分片
+
+继续复用现有上传分片接口：
+
+```http
+PUT /api/v1/upload/{upload_id}/chunk?chunk_index=0
+Authorization: Bearer <token>
+Content-Type: application/octet-stream
+
+<PLY 分片二进制>
+```
+
+#### 完成替换
+
+```http
+POST /api/v1/reconstruction/tasks/{task_id}/results/{file_id}/replace/complete?upload_id={upload_id}
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+Body：
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `expected_hash` | string | 否 | 修改后完整文件的 SHA-256 或 MD5；推荐 SHA-256 |
+| `expected_size` | integer | 否 | 修改后文件大小 |
+| `parts` | array | 是 | 每个分片的 `chunk_index` 和分片 MD5 `etag` |
+
+响应：
+
+```json
+{
+  "task_id": "recon_xxx",
+  "file_id": "file_ply",
+  "filename": "point_cloud.ply",
+  "mime_type": "model/ply",
+  "file_size": 123456,
+  "file_hash": "<修改后文件的 SHA-256>",
+  "replaced": true,
+  "verified": true
+}
+```
+
+限制：
+
+- 只能由任务所有者或管理员替换。
+- 只能替换该任务已关联的 `model/ply` 结果文件。
+- 任务处于 `queued` 或 `processing` 时禁止替换。
+- 替换成功后原 `file_id` 不变，任务详情和下载接口会返回修改后的 PLY 内容。
+
 ### 8.6 修改任务可见性
 
 ```http

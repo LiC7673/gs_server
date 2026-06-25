@@ -41,6 +41,10 @@ from app.schemas.reconstruction import (
     ReconstructionDiagnosticsResponse,
     ReconstructionLogsResponse,
     ReconstructionMeshStartRequest,
+    ReconstructionResultReplaceCompleteRequest,
+    ReconstructionResultReplaceCompleteResponse,
+    ReconstructionResultReplaceInitRequest,
+    ReconstructionResultReplaceInitResponse,
     ReconstructionStartByImagesRequest,
     ReconstructionStartResponse,
     ReconstructionStatusResponse,
@@ -53,6 +57,7 @@ from app.schemas.reconstruction import (
 from app.services.file_service import FileService
 from app.services.gpu_scheduler import GPULease, GPUScheduler
 from app.services.task_service import TaskService
+from app.services.upload_service import UploadService
 from app.services.user_service import UserService
 
 router = APIRouter(prefix="/reconstruction", tags=["reconstruction"])
@@ -843,6 +848,26 @@ def _has_ply_result(task: TaskRecord) -> bool:
         and _is_ply_model_file(link.file)
         for link in task.file_links
     )
+
+
+def _task_result_file(task: TaskRecord, file_id: str) -> FileRecord:
+    normalized = file_id.strip()
+    for link in task.file_links:
+        if (
+            link.role == TaskFileRole.RESULT
+            and link.file
+            and not link.file.is_deleted
+            and link.file.public_id == normalized
+        ):
+            return link.file
+    raise AppException("Result file is not linked to this task", status.HTTP_404_NOT_FOUND)
+
+
+def _replaceable_ply_result(task: TaskRecord, file_id: str) -> FileRecord:
+    record = _task_result_file(task, file_id)
+    if not _is_ply_model_file(record):
+        raise AppException("Only PLY result files can be replaced", status.HTTP_422_UNPROCESSABLE_ENTITY)
+    return record
 
 
 def _set_failed(
@@ -1922,6 +1947,105 @@ async def get_reconstruction_task(
     task = await TaskService.get_by_public_id(db, task_id)
     TaskService.ensure_readable(task, current_user)
     return _task_response(task, include_private=current_user.is_admin or task.user_id == current_user.id)
+
+
+@router.post(
+    "/tasks/{task_id}/results/{file_id}/replace/init",
+    response_model=ReconstructionResultReplaceInitResponse,
+)
+async def init_result_replacement_upload(
+    task_id: str,
+    file_id: str,
+    body: ReconstructionResultReplaceInitRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    task = await TaskService.get_by_public_id(db, task_id)
+    TaskService.ensure_owner(task, current_user)
+    if task.status in {TaskStatus.QUEUED, TaskStatus.PROCESSING}:
+        raise TaskStateException(f"Task is already {task.status.value}")
+    target = _replaceable_ply_result(task, file_id)
+    record = await UploadService.init_upload(
+        db,
+        current_user.id,
+        body.filename,
+        body.file_size,
+        body.mime_type,
+        body.file_hash,
+        body.chunk_size,
+        task_record_id=task.id,
+    )
+    record.file_id = target.id
+    await db.flush()
+    return ReconstructionResultReplaceInitResponse(
+        task_id=task.public_id,
+        file_id=target.public_id,
+        upload_id=record.upload_id,
+        chunk_size=record.chunk_size,
+        total_chunks=record.total_chunks,
+        expires_at=_iso(record.expired_at),
+    )
+
+
+@router.post(
+    "/tasks/{task_id}/results/{file_id}/replace/complete",
+    response_model=ReconstructionResultReplaceCompleteResponse,
+)
+async def complete_result_replacement_upload(
+    task_id: str,
+    file_id: str,
+    body: ReconstructionResultReplaceCompleteRequest,
+    upload_id: str = Query(..., min_length=1),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    task = await TaskService.get_by_public_id(db, task_id)
+    TaskService.ensure_owner(task, current_user)
+    if task.status in {TaskStatus.QUEUED, TaskStatus.PROCESSING}:
+        raise TaskStateException(f"Task is already {task.status.value}")
+    target = _replaceable_ply_result(task, file_id)
+    upload_record = await UploadService.get_progress(db, upload_id, current_user.id)
+    if upload_record.task_record_id != task.id or upload_record.file_id != target.id:
+        raise AppException("Upload session does not match this task result", status.HTTP_404_NOT_FOUND)
+    if upload_record.mime_type != "model/ply":
+        raise AppException("Only model/ply replacement uploads are supported", status.HTTP_422_UNPROCESSABLE_ENTITY)
+    previous_hash = target.file_hash
+    previous_size = target.file_size
+    storage_object, file_hash = await UploadService.merge_chunks(
+        db,
+        upload_id,
+        current_user.id,
+        body.expected_hash,
+        body.expected_size,
+        [(part.chunk_index, part.etag) for part in body.parts],
+    )
+    replaced = await FileService.replace_record_storage(
+        db,
+        target,
+        storage_object,
+        filename=upload_record.filename,
+        file_size=upload_record.file_size,
+        mime_type=upload_record.mime_type,
+        file_hash=file_hash,
+        metainfo={
+            "user_replaced": True,
+            "replaced_at": _iso(_utc_now()),
+            "replacement_upload_id": upload_id,
+            "previous_file_hash": previous_hash,
+            "previous_size_bytes": previous_size,
+        },
+    )
+    await UploadService.attach_file(upload_record, replaced, db)
+    return ReconstructionResultReplaceCompleteResponse(
+        task_id=task.public_id,
+        file_id=replaced.public_id,
+        filename=replaced.filename,
+        mime_type=replaced.mime_type,
+        file_size=replaced.file_size,
+        file_hash=replaced.file_hash,
+        replaced=True,
+        verified=replaced.file_hash == file_hash,
+    )
 
 
 @router.get("/tasks/{task_id}/inputs", response_model=ReconstructionTaskInputsResponse)
